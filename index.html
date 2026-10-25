@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description"
+    content="Daily Financial Diary - Aplikasi pencatatan keuangan harian pribadi yang modern, rapi, dan responsif. Pantau pemasukan, pengeluaran, dan saldo secara real-time.">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FinancialDiary">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.json">
+  <title>Daily Financial Diary - Catatan Keuangan Harian Pribadi</title>
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Supabase JS Client CDN with Fallback -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    if (!window.supabase) {
+      document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
+    }
+  </script>
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="css/style.css?v=3.0">
+</head>
+
+<body>
+  <!-- Auth Screen (Login & Register for Single User) -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-card-container">
+
+      <!-- Brand & Header -->
+      <div class="auth-brand">
+        <div class="auth-logo">
+          <i data-lucide="wallet-cards"></i>
+        </div>
+        <h1 class="auth-title">Daily Financial Diary</h1>
+        <p class="auth-tagline">Pencatatan Keuangan Harian Pribadi &bull; Autentikasi Supabase</p>
+      </div>
+
+      <!-- Config Warning if Credentials are Placeholder -->
+      <div id="supabase-config-warning" class="auth-config-warning hidden">
+        <div class="warning-icon">
+          <i data-lucide="alert-triangle"></i>
+        </div>
+        <div class="warning-text">
+          <strong>Koneksi Supabase Belum Dikonfigurasi</strong>
+          <p>Harap masukkan <code>SUPABASE_URL</code> dan <code>SUPABASE_ANON_KEY</code> Anda pada berkas
+            <code>js/supabaseClient.js</code>.
+          </p>
+          <button type="button" id="btn-bypass-demo" class="btn-demo-bypass">
+            <i data-lucide="play-circle"></i> Coba Mode Demo (Bypass Sementara)
+          </button>
+        </div>
+      </div>
+
+      <!-- Auth Card Box -->
+      <div class="auth-card">
+
+        <!-- Tab Selector: Login vs Sign Up -->
+        <div class="auth-tabs" role="tablist">
+          <button type="button" class="auth-tab active" id="tab-auth-login" data-tab="login">
+            <i data-lucide="log-in"></i>
+            <span>Masuk (Login)</span>
+          </button>
+          <button type="button" class="auth-tab" id="tab-auth-register" data-tab="register">
+            <i data-lucide="user-plus"></i>
+            <span>Daftar (Sign Up)</span>
+          </button>
+        </div>
+
+        <!-- Feedback Alert Box -->
+        <div id="auth-alert" class="auth-alert hidden" role="alert">
+          <i data-lucide="info" id="auth-alert-icon"></i>
+          <span id="auth-alert-text">Pesan informasi</span>
+        </div>
+
+        <!-- Auth Form -->
+        <form id="auth-form" novalidate>
+
+          <!-- Email Input -->
+          <div class="form-group">
+            <label for="auth-email" class="form-label">Alamat Email <span class="required">*</span></label>
+            <div class="input-with-icon">
+              <i data-lucide="mail" class="field-leading-icon"></i>
+              <input type="email" id="auth-email" class="form-control" placeholder="nama@email.com" autocomplete="email"
+                required>
+            </div>
+          </div>
+
+          <!-- Password Input -->
+          <div class="form-group" id="group-auth-password">
+            <div class="label-with-action">
+              <label for="auth-password" class="form-label">Kata Sandi (Password) <span
+                  class="required">*</span></label>
+              <a href="#" id="link-forgot-password" class="link-action-subtle">Lupa kata sandi?</a>
+            </div>
+            <div class="input-with-icon">
+              <i data-lucide="lock" class="field-leading-icon"></i>
+              <input type="password" id="auth-password" class="form-control" placeholder="Minimal 6 karakter"
+                autocomplete="current-password" minlength="6" required>
+              <button type="button" id="btn-toggle-password" class="btn-toggle-eye" aria-label="Lihat kata sandi">
+                <i data-lucide="eye" id="eye-icon"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Confirm Password (Shown only in Register mode) -->
+          <div class="form-group hidden" id="group-confirm-password">
+            <label for="auth-confirm-password" class="form-label">Konfirmasi Kata Sandi <span
+                class="required">*</span></label>
+            <div class="input-with-icon">
+              <i data-lucide="shield-check" class="field-leading-icon"></i>
+              <input type="password" id="auth-confirm-password" class="form-control"
+                placeholder="Ketik ulang kata sandi" autocomplete="new-password">
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" id="btn-auth-submit" class="btn btn-primary btn-auth-submit">
+            <span id="auth-spinner" class="spinner hidden"></span>
+            <span id="auth-submit-text">Masuk ke Diary</span>
+            <i data-lucide="arrow-right" id="auth-submit-icon"></i>
+          </button>
+
+        </form>
+
+        <!-- Auth Footer Note -->
+        <div class="auth-card-footer">
+          <p id="auth-footer-text">
+            Belum punya akun? <a href="#" id="link-switch-to-register">Daftar sekarang</a>
+          </p>
+          <p id="auth-back-to-login" class="hidden">
+            Ingat kata sandi Anda? <a href="#" id="link-back-to-login">Kembali ke Masuk</a>
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Quick Feature Highlights -->
+      <div class="auth-features">
+        <div class="feature-item">
+          <i data-lucide="lock"></i>
+          <span>Aman & Pribadi</span>
+        </div>
+        <div class="feature-item">
+          <i data-lucide="shield-check"></i>
+          <span>Autentikasi Supabase</span>
+        </div>
+        <div class="feature-item">
+          <i data-lucide="cloud"></i>
+          <span>Akses Fleksibel</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- App Container (Hidden when not authenticated) -->
+  <div class="app-layout hidden" id="app-layout">
+
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="header-container">
+        <!-- Logo & Branding -->
+        <div class="brand-section">
+          <div class="brand-logo">
+            <i data-lucide="wallet-cards"></i>
+          </div>
+          <div class="brand-text">
+            <h1 class="brand-title">Daily Financial Diary</h1>
+            <span class="brand-tagline">Catatan Keuangan Harian Pribadi</span>
+          </div>
+        </div>
+
+        <!-- Header Actions: Today Date, User Info, Theme & Logout -->
+        <div class="header-actions">
+          <!-- Status Tier: Today Date, User Info, Theme Toggle -->
+          <div class="header-status-tier">
+            <div class="today-date-badge" id="header-today-date" title="Tanggal Hari Ini">
+              <i data-lucide="calendar"></i>
+              <span id="current-date-text">Memuat tanggal...</span>
+            </div>
+
+            <!-- User Profile Display -->
+            <div class="user-badge" id="user-badge" title="Pengguna Terautentikasi">
+              <i data-lucide="user"></i>
+              <span id="user-email-display">user@supabase</span>
+            </div>
+
+            <!-- Theme Toggle (Gelap / Terang) Langsung di Sebelah Kanan Samping Nama Akun -->
+            <button id="theme-toggle-btn" class="icon-button" aria-label="Ganti Tema Gelap/Terang" title="Ganti Tema">
+              <i data-lucide="moon" id="theme-icon"></i>
+            </button>
+          </div>
+
+          <!-- CTA Tier: Add Note, PWA & Logout -->
+          <div class="header-cta-tier">
+            <!-- PWA Install Button & Network Offline Indicator -->
+            <div id="offline-badge" class="offline-badge hidden"
+              title="Aplikasi sedang offline, perubahan disimpan secara lokal">
+              <i data-lucide="wifi-off"></i>
+              <span>Offline</span>
+            </div>
+
+            <button id="btn-install-pwa" class="btn btn-install-app hidden"
+              aria-label="Pasang Aplikasi di HP atau Komputer" title="Pasang Aplikasi (Install PWA)">
+              <i data-lucide="download"></i>
+              <span>Pasang App</span>
+            </button>
+
+            <button id="btn-open-modal" class="btn btn-primary" aria-label="Tambah Catatan Transaksi">
+              <i data-lucide="plus-circle"></i>
+              <span>+ Tambah Catatan</span>
+            </button>
+
+            <!-- Logout Button -->
+            <button id="btn-logout" class="btn btn-logout" aria-label="Keluar dari akun" title="Keluar (Logout)">
+              <i data-lucide="log-out"></i>
+              <span>Keluar</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Dashboard Content -->
+    <main class="main-content">
+      <div class="dashboard-container">
+
+        <!-- Period Filter Bar & Action Toolbar -->
+        <div class="period-filter-bar">
+          <div class="period-title-group">
+            <h2 class="overview-title">Ringkasan Finansial</h2>
+            <span class="overview-subtitle" id="period-status-text">Periode: Bulan Ini</span>
+          </div>
+          <div class="period-toolbar-group">
+            <div class="period-pills" id="period-selector-pills">
+              <button class="period-pill active" data-period="this-month">Bulan Ini</button>
+              <button class="period-pill" data-period="last-month">Bulan Lalu</button>
+              <button class="period-pill" data-period="all">Semua Waktu</button>
+            </div>
+            <div class="feature-action-buttons">
+              <button id="btn-export-csv" class="btn btn-outline-action"
+                title="Unduh laporan transaksi dalam format Excel / CSV">
+                <i data-lucide="download"></i>
+                <span>Ekspor CSV</span>
+              </button>
+              <button id="btn-open-recurring" class="btn btn-outline-action"
+                title="Transaksi rutin & langganan berkala">
+                <i data-lucide="repeat"></i>
+                <span>Transaksi Rutin</span>
+              </button>
+              <button id="btn-open-category-modal" class="btn btn-outline-action"
+                title="Kelola, perbaiki tulisan typo, & tambah kategori baru">
+                <i data-lucide="tags"></i>
+                <span>Kelola Kategori</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metric Cards Section -->
+        <section class="metrics-grid" aria-label="Ringkasan Metrik Finansial">
+
+          <!-- Total Pemasukan Card -->
+          <div class="metric-card income-card">
+            <div class="metric-header">
+              <span class="metric-label">Total Pemasukan</span>
+              <div class="metric-icon-box income-icon">
+                <i data-lucide="arrow-down-left"></i>
+              </div>
+            </div>
+            <div class="metric-body">
+              <h2 class="metric-value" id="total-income-value">Rp 0</h2>
+              <div class="metric-footer">
+                <span class="metric-badge income-pill" id="income-count-pill">
+                  <i data-lucide="trending-up"></i> 0 Transaksi
+                </span>
+                <span class="metric-subtext">Akumulasi Pemasukan</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Total Pengeluaran Card -->
+          <div class="metric-card expense-card">
+            <div class="metric-header">
+              <span class="metric-label">Total Pengeluaran</span>
+              <div class="metric-icon-box expense-icon">
+                <i data-lucide="arrow-up-right"></i>
+              </div>
+            </div>
+            <div class="metric-body">
+              <h2 class="metric-value" id="total-expense-value">Rp 0</h2>
+              <div class="metric-footer">
+                <span class="metric-badge expense-pill" id="expense-count-pill">
+                  <i data-lucide="trending-down"></i> 0 Transaksi
+                </span>
+                <span class="metric-subtext">Akumulasi Pengeluaran</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Saldo Akhir Card -->
+          <div class="metric-card balance-card">
+            <div class="metric-header">
+              <span class="metric-label">Saldo Akhir</span>
+              <div class="metric-icon-box balance-icon">
+                <i data-lucide="shield-check"></i>
+              </div>
+            </div>
+            <div class="metric-body">
+              <h2 class="metric-value" id="net-balance-value">Rp 0</h2>
+              <div class="metric-footer">
+                <span class="metric-badge balance-pill" id="balance-status-pill">
+                  <i data-lucide="sparkles"></i> Saldo Aman
+                </span>
+                <span class="metric-subtext">Bersih / Net Cashflow</span>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- Two Columns Layout: Daily Feed (Left) & Visual Analytics (Right) -->
+        <div class="content-columns">
+
+          <!-- LEFT COLUMN: Daily Feed -->
+          <section class="feed-section" aria-label="Daftar Transaksi Harian">
+            <div class="section-card">
+
+              <!-- Feed Section Header with Search & Filter -->
+              <div class="feed-header">
+                <div class="feed-title-wrap">
+                  <h3 class="section-title">
+                    <i data-lucide="history"></i>
+                    <span>Daily Feed Transaksi</span>
+                  </h3>
+                  <span class="section-subtitle">Daftar pemasukan & pengeluaran yang dikelompokkan per tanggal</span>
+                </div>
+
+                <!-- Feed Controls -->
+                <div class="feed-controls">
+                  <!-- Search bar -->
+                  <div class="search-input-wrap">
+                    <i data-lucide="search" class="search-icon"></i>
+                    <input type="text" id="feed-search-input" placeholder="Cari catatan atau kategori..."
+                      aria-label="Cari transaksi">
+                    <button id="btn-clear-search" class="btn-clear hidden" aria-label="Hapus pencarian">
+                      <i data-lucide="x"></i>
+                    </button>
+                  </div>
+
+                  <!-- Type Filter Tabs -->
+                  <div class="filter-tabs" role="tablist">
+                    <button class="filter-tab active" data-filter="all" id="tab-all">Semua</button>
+                    <button class="filter-tab" data-filter="income" id="tab-income">Pemasukan (+)</button>
+                    <button class="filter-tab" data-filter="expense" id="tab-expense">Pengeluaran (-)</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Transaction Feed Container (Rendered dynamically) -->
+              <div id="transaction-feed" class="transaction-feed">
+                <!-- Grouped transactions by date will be inserted by JavaScript -->
+              </div>
+
+              <!-- Empty State Template -->
+              <div id="empty-feed-state" class="empty-state hidden">
+                <div class="empty-icon-wrap">
+                  <i data-lucide="receipt"></i>
+                </div>
+                <h4>Belum ada transaksi ditemukan</h4>
+                <p>Mulai catat transaksi harianmu dengan menekan tombol di bawah.</p>
+                <button class="btn btn-primary" id="btn-empty-add">
+                  <i data-lucide="plus-circle"></i> + Tambah Catatan Baru
+                </button>
+              </div>
+
+            </div>
+          </section>
+
+          <!-- RIGHT COLUMN: Chart & Financial Insights -->
+          <aside class="sidebar-section" aria-label="Statistik & Analisis">
+
+            <!-- Category & Trend Analytics Card -->
+            <div class="section-card chart-card">
+              <div class="card-header-simple">
+                <div>
+                  <h3 class="card-title">
+                    <i data-lucide="bar-chart-3" id="analytics-card-icon"></i>
+                    <span id="analytics-card-title">Analisis Finansial</span>
+                  </h3>
+                  <span class="card-subtitle" id="analytics-card-subtitle">Proporsi kategori & tren perbandingan arus
+                    kas</span>
+                </div>
+                <div class="chart-tab-pills">
+                  <button type="button" class="chart-tab-pill active" id="tab-chart-category" data-chart="doughnut"
+                    title="Grafik Proporsi Kategori">
+                    <i data-lucide="pie-chart"></i> Kategori
+                  </button>
+                  <button type="button" class="chart-tab-pill" id="tab-chart-trend" data-chart="bar"
+                    title="Grafik Tren Pemasukan vs Pengeluaran">
+                    <i data-lucide="trending-up"></i> Tren Kas
+                  </button>
+                </div>
+              </div>
+
+              <!-- View 1: Doughnut Category Chart Wrapper -->
+              <div id="category-chart-view">
+                <div class="chart-wrapper">
+                  <div class="chart-canvas-container">
+                    <canvas id="expense-chart"></canvas>
+                    <div id="chart-center-metric" class="chart-center-text">
+                      <span class="center-label">Total Beban</span>
+                      <span class="center-value" id="chart-center-amount">Rp 0</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Custom Category Legend & Progress Breakdown -->
+                <div class="category-breakdown-list" id="category-legend-list">
+                  <!-- Injected via JavaScript -->
+                </div>
+              </div>
+
+              <!-- View 2: Cashflow Trend Bar Chart Wrapper -->
+              <div id="trend-chart-view" class="hidden">
+                <div class="trend-canvas-container">
+                  <canvas id="trend-bar-chart"></canvas>
+                </div>
+                <div class="trend-summary-legend">
+                  <div class="trend-legend-pill income-legend">
+                    <span class="legend-dot income-dot"></span>
+                    <span>Pemasukan (+)</span>
+                  </div>
+                  <div class="trend-legend-pill expense-legend">
+                    <span class="legend-dot expense-dot"></span>
+                    <span>Pengeluaran (-)</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Monthly Budget Card -->
+            <div class="section-card budget-card">
+              <div class="card-header-simple">
+                <div>
+                  <h3 class="card-title">
+                    <i data-lucide="target"></i>
+                    <span>Anggaran Bulanan</span>
+                  </h3>
+                  <span class="card-subtitle" id="budget-period-label">Target Pengeluaran Bulan Ini</span>
+                </div>
+                <button id="btn-edit-budget" class="btn-text-action" title="Atur Batas Anggaran">
+                  <i data-lucide="pencil"></i> Atur
+                </button>
+              </div>
+
+              <div class="budget-body">
+                <div class="budget-amounts-row">
+                  <div>
+                    <span class="budget-label">Terpakai</span>
+                    <h4 class="budget-spent-val" id="budget-spent-amount">Rp 0</h4>
+                  </div>
+                  <div class="text-right">
+                    <span class="budget-label">Batas Anggaran</span>
+                    <h4 class="budget-limit-val" id="budget-limit-amount">Rp 3.000.000</h4>
+                  </div>
+                </div>
+
+                <div class="budget-progress-bg">
+                  <div class="budget-progress-fill" id="budget-progress-bar" style="width: 0%;"></div>
+                </div>
+
+                <div class="budget-footer-row">
+                  <span class="budget-remaining-text" id="budget-remaining-text">Sisa: Rp 3.000.000</span>
+                  <span class="budget-percent-badge" id="budget-percent-badge">0%</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Financial Health & Quick Tips Card -->
+            <div class="section-card summary-card">
+              <div class="card-header-simple">
+                <div>
+                  <h3 class="card-title">
+                    <i data-lucide="activity"></i>
+                    <span>Kesehatan Finansial</span>
+                  </h3>
+                  <span class="card-subtitle">Indikator rasio tabungan & ringkasan</span>
+                </div>
+              </div>
+
+              <div class="health-card-body">
+                <!-- Savings Rate Gauge -->
+                <div class="savings-rate-box">
+                  <div class="savings-rate-top">
+                    <span class="savings-label">Rasio Tabungan (Savings Rate)</span>
+                    <span class="savings-percent" id="savings-rate-text">0%</span>
+                  </div>
+                  <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="savings-rate-bar" style="width: 0%;"></div>
+                  </div>
+                  <p class="savings-note" id="savings-status-note">Analisis performa keuangan Anda bulan ini.</p>
+                </div>
+
+                <!-- Mini Statistics Grid -->
+                <div class="mini-stats-grid">
+                  <div class="mini-stat-item">
+                    <span class="mini-stat-label">Rata-rata / Transaksi</span>
+                    <span class="mini-stat-value" id="stat-avg-expense">Rp 0</span>
+                  </div>
+                  <div class="mini-stat-item">
+                    <span class="mini-stat-label">Pengeluaran Terbesar</span>
+                    <span class="mini-stat-value" id="stat-max-expense">Rp 0</span>
+                  </div>
+                </div>
+
+                <!-- Reset & Demo Data Actions -->
+                <div class="data-actions-wrap">
+                  <button id="btn-reset-demo" class="btn-text-action" title="Kembalikan data contoh bawaan">
+                    <i data-lucide="rotate-ccw"></i> Reset Data Contoh
+                  </button>
+                  <button id="btn-clear-all" class="btn-text-action danger-text" title="Hapus seluruh data transaksi">
+                    <i data-lucide="trash-2"></i> Hapus Semua
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </aside>
+
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-container">
+        <p><strong>Daily Financial Diary</strong> &bull; Aplikasi Pengelola Keuangan Pribadi Harian &bull; Berbasis
+          Browser Tanpa Registrasi</p>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Modal / Popup Form Transaksi -->
+  <div id="transaction-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true"
+    aria-labelledby="modal-title">
+    <div class="modal-dialog">
+
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon-badge">
+            <i data-lucide="file-plus-2"></i>
+          </div>
+          <div>
+            <h3 id="modal-title" class="modal-title">Tambah Catatan Transaksi</h3>
+            <p class="modal-subtitle">Catat pengeluaran atau pemasukan baru Anda</p>
+          </div>
+        </div>
+        <button id="btn-close-modal" class="modal-close-btn" aria-label="Tutup formulir">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <!-- Modal Form -->
+      <form id="transaction-form" novalidate>
+
+        <!-- Transaction Type Switcher -->
+        <div class="form-group">
+          <label class="form-label">Jenis Transaksi</label>
+          <div class="type-toggle-container">
+            <button type="button" class="type-btn type-expense active" id="btn-type-expense" data-type="expense">
+              <i data-lucide="arrow-up-right"></i>
+              <span>Pengeluaran (-)</span>
+            </button>
+            <button type="button" class="type-btn type-income" id="btn-type-income" data-type="income">
+              <i data-lucide="arrow-down-left"></i>
+              <span>Pemasukan (+)</span>
+            </button>
+          </div>
+          <input type="hidden" id="form-type" value="expense">
+        </div>
+
+        <!-- Nominal (Amount) Input -->
+        <div class="form-group">
+          <label for="form-amount" class="form-label">Nominal (Rupiah) <span class="required">*</span></label>
+          <div class="currency-input-wrap">
+            <span class="currency-symbol">Rp</span>
+            <input type="text" id="form-amount" class="form-control currency-field" placeholder="0" inputmode="numeric"
+              autocomplete="off" required>
+          </div>
+          <span class="field-hint" id="amount-hint">Masukkan jumlah nominal transaksi</span>
+        </div>
+
+        <!-- Category Dropdown with Quick Create Option -->
+        <div class="form-group">
+          <div class="label-with-action">
+            <label for="form-category" class="form-label">Kategori <span class="required">*</span></label>
+            <button type="button" id="btn-quick-create-cat" class="link-action-subtle"
+              title="Kelola, perbaiki tulisan salah ketik / typo, atau buat kategori baru">
+              <i data-lucide="pencil-line" style="width: 14px; height: 14px; vertical-align: -2px;"></i> Kelola / Ubah
+              Kategori
+            </button>
+          </div>
+          <div class="select-wrap">
+            <select id="form-category" class="form-control" required>
+              <!-- Populated dynamically via JS -->
+            </select>
+            <i data-lucide="chevron-down" class="select-icon"></i>
+          </div>
+        </div>
+
+        <!-- Date Picker Input -->
+        <div class="form-group">
+          <label for="form-date" class="form-label">Tanggal Transaksi <span class="required">*</span></label>
+          <div class="date-input-wrap">
+            <input type="date" id="form-date" class="form-control" required>
+          </div>
+        </div>
+
+        <!-- Notes / Description Input -->
+        <div class="form-group">
+          <label for="form-note" class="form-label">Catatan / Keterangan <span class="required">*</span></label>
+          <input type="text" id="form-note" class="form-control"
+            placeholder="Contoh: Makan siang Nasi Padang, Kopi, Bensin..." maxlength="80" required>
+        </div>
+
+        <!-- Hidden Edit ID -->
+        <input type="hidden" id="form-edit-id" value="">
+
+        <!-- Modal Actions Footer with Reset / Typo Option -->
+        <div class="modal-footer">
+          <button type="button" id="btn-reset-form-fields" class="btn btn-outline"
+            title="Kosongkan formulir jika ada salah ketik atau typo">
+            <i data-lucide="rotate-ccw"></i>
+            <span>Reset Typo</span>
+          </button>
+          <button type="button" id="btn-cancel-modal" class="btn btn-secondary">
+            Batal
+          </button>
+          <button type="submit" id="btn-submit-form" class="btn btn-primary">
+            <i data-lucide="check-circle-2"></i>
+            <span id="btn-submit-label">Simpan Catatan</span>
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Atur Anggaran Bulanan -->
+  <div id="budget-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true"
+    aria-labelledby="budget-modal-title">
+    <div class="modal-dialog modal-dialog-sm">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon-badge">
+            <i data-lucide="target"></i>
+          </div>
+          <div>
+            <h3 id="budget-modal-title" class="modal-title">Atur Anggaran Bulanan</h3>
+            <p class="modal-subtitle">Tentukan batas maksimal pengeluaran bulanan Anda</p>
+          </div>
+        </div>
+        <button id="btn-close-budget-modal" class="modal-close-btn" aria-label="Tutup">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <form id="budget-form" novalidate>
+        <div class="form-group" style="padding: 1.25rem 1.5rem 0.5rem;">
+          <label for="form-budget-amount" class="form-label">Batas Anggaran Pengeluaran (Rupiah) <span
+              class="required">*</span></label>
+          <div class="currency-input-wrap">
+            <span class="currency-symbol">Rp</span>
+            <input type="text" id="form-budget-amount" class="form-control currency-field" placeholder="3.000.000"
+              inputmode="numeric" autocomplete="off" required>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="padding: 1rem 1.5rem 1.25rem;">
+          <button type="button" id="btn-cancel-budget-modal" class="btn btn-secondary">
+            Batal
+          </button>
+          <button type="submit" id="btn-submit-budget" class="btn btn-primary">
+            <i data-lucide="check-circle-2"></i>
+            <span>Simpan Anggaran</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Transaksi Rutin & Cepat -->
+  <div id="recurring-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true"
+    aria-labelledby="recurring-modal-title">
+    <div class="modal-dialog modal-dialog-md">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon-badge">
+            <i data-lucide="repeat"></i>
+          </div>
+          <div>
+            <h3 id="recurring-modal-title" class="modal-title">Transaksi Rutin & Cepat</h3>
+            <p class="modal-subtitle">Catat tagihan berkala atau pos rutin dengan satu klik</p>
+          </div>
+        </div>
+        <button id="btn-close-recurring-modal" class="modal-close-btn" aria-label="Tutup">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-scroll-body">
+        <div class="recurring-templates-grid" id="recurring-templates-list">
+          <!-- Rendered dynamically via JS with quick Catat Sekarang buttons -->
+        </div>
+
+        <!-- Add Custom Recurring Form -->
+        <div class="recurring-add-box">
+          <div class="recurring-add-header">
+            <i data-lucide="plus-circle"></i>
+            <h4 class="subheading-title" style="margin-bottom: 0;">Tambah Template Rutin Baru</h4>
+          </div>
+          <form id="recurring-form" novalidate>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="form-rec-type" class="form-label">Jenis Transaksi</label>
+                <div class="select-wrap">
+                  <select id="form-rec-type" class="form-control">
+                    <option value="expense">Pengeluaran (-)</option>
+                    <option value="income">Pemasukan (+)</option>
+                  </select>
+                  <i data-lucide="chevron-down" class="select-icon"></i>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="form-rec-category" class="form-label">Kategori</label>
+                <div class="select-wrap">
+                  <select id="form-rec-category" class="form-control">
+                    <!-- dynamically filled -->
+                  </select>
+                  <i data-lucide="chevron-down" class="select-icon"></i>
+                </div>
+              </div>
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="form-rec-note" class="form-label">Nama Transaksi / Catatan <span
+                    class="required">*</span></label>
+                <input type="text" id="form-rec-note" class="form-control" placeholder="Contoh: Tagihan WiFi Indihome"
+                  required>
+              </div>
+              <div class="form-group">
+                <label for="form-rec-amount" class="form-label">Nominal (Rupiah) <span class="required">*</span></label>
+                <div class="currency-input-wrap">
+                  <span class="currency-symbol">Rp</span>
+                  <input type="text" id="form-rec-amount" class="form-control currency-field" placeholder="350.000"
+                    inputmode="numeric" autocomplete="off" required>
+                </div>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full" id="btn-save-recurring">
+              <i data-lucide="plus"></i> Tambahkan ke Daftar Template
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btn-cancel-recurring-modal" class="btn btn-secondary">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Kelola & Edit Kategori Kustom -->
+  <div id="category-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true"
+    aria-labelledby="category-modal-title">
+    <div class="modal-dialog modal-dialog-md">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon-badge">
+            <i data-lucide="tags"></i>
+          </div>
+          <div>
+            <h3 id="category-modal-title" class="modal-title">Kelola & Edit Kategori Kustom</h3>
+            <p id="category-modal-subtitle" class="modal-subtitle">Buat kategori baru atau perbaiki tulisan jika ada
+              yang salah ketik / typo</p>
+          </div>
+        </div>
+        <button id="btn-close-category-modal" class="modal-close-btn" aria-label="Tutup">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-scroll-body">
+        <!-- Form Buat / Edit Kategori -->
+        <form id="category-form" novalidate class="category-edit-form-box">
+          <input type="hidden" id="form-cat-edit-id" value="">
+
+          <div class="form-group">
+            <label class="form-label">Jenis Kategori <span class="required">*</span></label>
+            <div class="type-toggle-container">
+              <button type="button" class="type-btn type-expense active" id="btn-cat-type-expense" data-type="expense">
+                <i data-lucide="arrow-up-right"></i>
+                <span>Pengeluaran</span>
+              </button>
+              <button type="button" class="type-btn type-income" id="btn-cat-type-income" data-type="income">
+                <i data-lucide="arrow-down-left"></i>
+                <span>Pemasukan</span>
+              </button>
+            </div>
+            <input type="hidden" id="form-cat-type" value="expense">
+          </div>
+
+          <div class="form-group">
+            <label for="form-cat-name" class="form-label">Nama Kategori <span class="required">*</span></label>
+            <input type="text" id="form-cat-name" class="form-control"
+              placeholder="Contoh: Investasi, Asuransi, Belanja..." maxlength="40" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Pilih Warna Aksen</label>
+            <div class="color-picker-grid" id="category-color-picker">
+              <button type="button" class="color-dot-choice active" data-color="#4f46e5"
+                style="background-color: #4f46e5;" aria-label="Indigo"></button>
+              <button type="button" class="color-dot-choice" data-color="#818cf8" style="background-color: #818cf8;"
+                aria-label="Indigo Muda"></button>
+              <button type="button" class="color-dot-choice" data-color="#059669" style="background-color: #059669;"
+                aria-label="Hijau"></button>
+              <button type="button" class="color-dot-choice" data-color="#34d399" style="background-color: #34d399;"
+                aria-label="Hijau Muda"></button>
+              <button type="button" class="color-dot-choice" data-color="#e11d48" style="background-color: #e11d48;"
+                aria-label="Merah"></button>
+              <button type="button" class="color-dot-choice" data-color="#64748b" style="background-color: #64748b;"
+                aria-label="Abu-abu"></button>
+            </div>
+            <input type="hidden" id="form-cat-color" value="#4f46e5">
+          </div>
+
+          <div class="category-form-actions">
+            <button type="button" id="btn-cancel-cat-edit" class="btn btn-outline hidden">
+              <i data-lucide="x"></i> Batal Edit
+            </button>
+            <button type="submit" id="btn-submit-category" class="btn btn-primary">
+              <i data-lucide="check-circle-2"></i>
+              <span id="btn-submit-cat-label">Simpan Kategori</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- Daftar Kategori Kustom yang sudah dibuat pengguna -->
+        <div class="custom-cat-manager-box">
+          <div class="custom-cat-manager-header">
+            <h4 class="subheading-title" style="margin-bottom: 0;">Kategori Kustom Saya</h4>
+            <span class="custom-cat-count-badge" id="custom-cat-count">0 Kategori</span>
+          </div>
+          <div class="custom-cat-list" id="custom-categories-list">
+            <!-- Rendered dynamically via JS with Edit (Pensil) & Delete buttons -->
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btn-cancel-category-modal" class="btn btn-secondary">
+          Selesai / Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Buat Kata Sandi Baru (Password Recovery) -->
+  <div id="reset-password-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true"
+    aria-labelledby="reset-modal-title">
+    <div class="modal-dialog modal-dialog-sm">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon-badge">
+            <i data-lucide="key-round"></i>
+          </div>
+          <div>
+            <h3 id="reset-modal-title" class="modal-title">Buat Kata Sandi Baru</h3>
+            <p class="modal-subtitle">Tentukan kata sandi baru untuk akun Anda</p>
+          </div>
+        </div>
+        <button id="btn-close-reset-modal" class="modal-close-btn" aria-label="Tutup">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <form id="new-password-form" novalidate>
+        <div class="form-group" style="padding: 1.25rem 1.5rem 0.5rem;">
+          <label for="form-new-password" class="form-label">Kata Sandi Baru <span class="required">*</span></label>
+          <div class="input-with-icon">
+            <i data-lucide="lock" class="field-leading-icon"></i>
+            <input type="password" id="form-new-password" class="form-control" placeholder="Minimal 6 karakter"
+              minlength="6" required>
+          </div>
+        </div>
+
+        <div class="form-group" style="padding: 0 1.5rem 1rem;">
+          <label for="form-confirm-new-password" class="form-label">Konfirmasi Kata Sandi Baru <span
+              class="required">*</span></label>
+          <div class="input-with-icon">
+            <i data-lucide="shield-check" class="field-leading-icon"></i>
+            <input type="password" id="form-confirm-new-password" class="form-control"
+              placeholder="Ketik ulang kata sandi baru" minlength="6" required>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="padding: 1rem 1.5rem 1.25rem;">
+          <button type="submit" id="btn-submit-new-password" class="btn btn-primary" style="width: 100%;">
+            <i data-lucide="check-circle-2"></i>
+            <span>Simpan Kata Sandi Baru</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Supabase Client Configuration & Init -->
+  <script src="js/supabaseClient.js?v=2.1"></script>
+
+  <!-- Main JavaScript File -->
+  <script src="js/app.js?v=2.7"></script>
+</body>
+
+</html>
