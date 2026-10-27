@@ -391,22 +391,42 @@
   // --------------------------------------------------------------------------
   // STORAGE & SUPABASE DATABASE SYNC
   // --------------------------------------------------------------------------
+  const DEMO_USER_ID = 'demo-user-1';
+
+  // True jika pengguna login dengan akun Supabase sungguhan (bukan Mode Demo)
+  function isCloudUser() {
+    return !!(currentUser && currentUser.id && currentUser.id !== DEMO_USER_ID);
+  }
+
+  // Client Supabase hanya dipakai untuk akun cloud; Mode Demo murni lokal
+  function getCloudClient() {
+    if (!isCloudUser()) return null;
+    return window.getSupabaseClient ? window.getSupabaseClient() : null;
+  }
+
+  // Cache lokal dipisah per akun agar data contoh / akun lain tidak tercampur
+  function getTransactionsStorageKey() {
+    return isCloudUser() ? `${STORAGE_KEY}_user_${currentUser.id}` : STORAGE_KEY;
+  }
+
   function loadTransactionsFromLocal() {
+    // Akun cloud tidak pernah diisi data contoh otomatis
+    const fallback = () => (isCloudUser() ? [] : getInitialDummyData());
     try {
-      const data = localStorage.getItem(STORAGE_KEY);
+      const data = localStorage.getItem(getTransactionsStorageKey());
       if (data) {
         transactions = JSON.parse(data);
       } else {
-        transactions = getInitialDummyData();
+        transactions = fallback();
       }
     } catch (e) {
       console.error('Error loading local transactions', e);
-      transactions = getInitialDummyData();
+      transactions = fallback();
     }
   }
 
   async function fetchTransactions() {
-    const client = window.getSupabaseClient ? window.getSupabaseClient() : null;
+    const client = getCloudClient();
     
     // Jika user login dengan Supabase, tarik data dari database cloud Supabase
     if (client && currentUser && currentUser.id) {
@@ -436,6 +456,7 @@
             createdAt: item.created_at ? new Date(item.created_at).getTime() : Date.now()
           }));
           console.log(`[Supabase DB] Berhasil memuat ${transactions.length} transaksi dari cloud.`);
+          saveTransactions(); // Perbarui cache lokal agar sama dengan cloud
           updateAllViews();
           return;
         }
@@ -454,10 +475,50 @@
 
   function saveTransactions() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+      localStorage.setItem(getTransactionsStorageKey(), JSON.stringify(transactions));
     } catch (e) {
       console.error('Error saving to localStorage', e);
     }
+  }
+
+  function mapCloudRow(item) {
+    return {
+      id: item.id,
+      type: item.type,
+      amount: Number(item.amount),
+      category: item.category,
+      date: item.date,
+      note: item.note || '',
+      createdAt: item.created_at ? new Date(item.created_at).getTime() : Date.now()
+    };
+  }
+
+  // Ganti seluruh transaksi milik user di Supabase dengan daftar baru.
+  // Return array transaksi hasil cloud, atau null jika gagal.
+  async function replaceCloudTransactions(client, list) {
+    const { error: delError } = await client
+      .from('transactions')
+      .delete()
+      .eq('user_id', currentUser.id);
+    if (delError) {
+      showToast('Gagal menghapus data di Supabase: ' + delError.message, 'danger');
+      return null;
+    }
+    if (!list.length) return [];
+
+    const rows = list.map(t => ({
+      type: t.type,
+      amount: t.amount,
+      category: t.category,
+      date: t.date,
+      note: t.note || ''
+    }));
+    const { data, error } = await client.from('transactions').insert(rows).select();
+    if (error) {
+      showToast('Gagal menyimpan data contoh ke Supabase: ' + error.message, 'danger');
+      return [];
+    }
+    return (data || []).map(mapCloudRow);
   }
 
   // --------------------------------------------------------------------------
@@ -1485,7 +1546,7 @@
       if (txUpdatedCount > 0) {
         saveTransactions();
         // If connected to Supabase, update transactions in database as well
-        const client = window.getSupabaseClient ? window.getSupabaseClient() : null;
+        const client = getCloudClient();
         if (client && currentUser && currentUser.id) {
           try {
             await client
@@ -1694,7 +1755,7 @@
 
   async function recordRecurringTransaction(tpl) {
     const today = getTodayDateString(0);
-    const client = window.getSupabaseClient ? window.getSupabaseClient() : null;
+    const client = getCloudClient();
 
     if (client && currentUser && currentUser.id) {
       try {
@@ -1725,6 +1786,7 @@
             note: inserted.note || '',
             createdAt: inserted.created_at ? new Date(inserted.created_at).getTime() : Date.now()
           });
+          saveTransactions();
           updateAllViews();
           closeRecurringModal();
           showToast(`Transaksi rutin "${tpl.name}" senilai ${formatRupiah(tpl.amount)} berhasil dicatat hari ini!`, 'success');
@@ -2030,7 +2092,7 @@
     }
 
     const numericAmount = parseInt(rawAmount, 10);
-    const client = window.getSupabaseClient ? window.getSupabaseClient() : null;
+    const client = getCloudClient();
 
     // ==========================================
     // CASE 1: EDIT / PERBARUI TRANSAKSI
@@ -2112,6 +2174,7 @@
             note: inserted.note || '',
             createdAt: inserted.created_at ? new Date(inserted.created_at).getTime() : Date.now()
           });
+          saveTransactions();
           updateAllViews();
           closeModal();
           const typeLabel = type === 'income' ? 'Pemasukan' : 'Pengeluaran';
@@ -2148,7 +2211,7 @@
     if (!tx) return;
 
     if (confirm(`Hapus catatan "${tx.note}" senilai ${formatRupiah(tx.amount)}?`)) {
-      const client = window.getSupabaseClient ? window.getSupabaseClient() : null;
+      const client = getCloudClient();
       if (client && currentUser && currentUser.id) {
         try {
           const { error } = await client
@@ -3022,9 +3085,17 @@
 
     // Reset Demo Data
     if (DOM.btnResetDemo) {
-      DOM.btnResetDemo.addEventListener('click', () => {
+      DOM.btnResetDemo.addEventListener('click', async () => {
         if (confirm('Kembalikan data ke contoh awal bawaan aplikasi?')) {
-          transactions = getInitialDummyData();
+          const client = getCloudClient();
+          if (client) {
+            // Akun cloud: data contoh benar-benar ditulis ke Supabase
+            const result = await replaceCloudTransactions(client, getInitialDummyData());
+            if (result === null) return;
+            transactions = result;
+          } else {
+            transactions = getInitialDummyData();
+          }
           saveTransactions();
           updateAllViews();
           showToast('Data contoh bawaan berhasil dipulihkan!', 'info');
@@ -3034,8 +3105,14 @@
 
     // Clear All Data
     if (DOM.btnClearAll) {
-      DOM.btnClearAll.addEventListener('click', () => {
+      DOM.btnClearAll.addEventListener('click', async () => {
         if (confirm('Apakah Anda yakin ingin menghapus SEMUA catatan transaksi?')) {
+          const client = getCloudClient();
+          if (client) {
+            // Akun cloud: hapus juga di Supabase agar tidak muncul lagi saat dibuka ulang
+            const result = await replaceCloudTransactions(client, []);
+            if (result === null) return;
+          }
           transactions = [];
           saveTransactions();
           updateAllViews();
